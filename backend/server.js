@@ -30,14 +30,15 @@ const INTUIT_API_BASE =
 
 /*
 ============================================================
-TEMPORARY TOKEN STORAGE
+TEMPORARY QUICKBOOKS CONNECTION STORAGE
 ============================================================
 
-IMPORTANT:
-This is temporary development storage.
+This is temporary.
 
-Tokens will be moved to persistent encrypted storage
-before the system is considered production-ready.
+The tokens are stored only while this Render instance
+is running.
+
+Later we will move this to persistent encrypted storage.
 
 ============================================================
 */
@@ -76,7 +77,7 @@ console.log("========================================");
 
 /*
 ============================================================
-HELPER - CHECK INTUIT CONFIGURATION
+INTUIT CONFIGURATION VALIDATION
 ============================================================
 */
 
@@ -106,7 +107,7 @@ app.get("/", (req, res) => {
   res.json({
     status: "online",
     service: "Lesik Receipt Automation",
-    version: "1.1.0"
+    version: "1.2.0"
   });
 });
 
@@ -142,7 +143,7 @@ app.get("/debug/intuit", (req, res) => {
 
 /*
 ============================================================
-INTUIT GENERATED OAUTH URL DEBUG
+INTUIT OAUTH URL DEBUG
 ============================================================
 */
 
@@ -245,7 +246,8 @@ app.get("/auth/intuit/callback", async (req, res) => {
     return res.status(400).json({
       success: false,
       error: error,
-      error_description: error_description || null
+      error_description:
+        error_description || null
     });
   }
 
@@ -264,7 +266,8 @@ app.get("/auth/intuit/callback", async (req, res) => {
   Validate configuration
   */
 
-  const configError = validateIntuitConfiguration();
+  const configError =
+    validateIntuitConfiguration();
 
   if (configError) {
     return res.status(500).json({
@@ -289,6 +292,7 @@ app.get("/auth/intuit/callback", async (req, res) => {
         headers: {
           "Content-Type":
             "application/x-www-form-urlencoded",
+
           "Authorization":
             "Basic " +
             Buffer.from(
@@ -300,38 +304,51 @@ app.get("/auth/intuit/callback", async (req, res) => {
       }
     );
 
-    const tokenData = tokenResponse.data;
+    const tokenData =
+      tokenResponse.data;
 
     /*
-    Calculate access token expiration
+    Determine expiration
     */
 
     const expiresIn =
       Number(tokenData.expires_in) || 3600;
 
     const accessTokenExpiresAt =
-      Date.now() + expiresIn * 1000;
+      Date.now() +
+      expiresIn * 1000;
 
     /*
-    Store connection information
+    Store QuickBooks connection
     */
 
     quickbooksConnection = {
       connected: true,
-      realmId: realmId || null,
+
+      realmId:
+        realmId || null,
+
       accessToken:
         tokenData.access_token || null,
+
       refreshToken:
         tokenData.refresh_token || null,
+
       accessTokenExpiresAt:
         accessTokenExpiresAt,
+
       connectedAt:
         new Date().toISOString()
     };
 
     console.log("========================================");
-    console.log("QuickBooks OAuth successful");
-    console.log("Realm ID:", realmId || "MISSING");
+    console.log(
+      "QuickBooks OAuth successful"
+    );
+    console.log(
+      "Realm ID:",
+      realmId || "MISSING"
+    );
     console.log(
       "Access token received:",
       !!tokenData.access_token
@@ -342,23 +359,31 @@ app.get("/auth/intuit/callback", async (req, res) => {
     );
     console.log(
       "Access token expires:",
-      new Date(accessTokenExpiresAt).toISOString()
+      new Date(
+        accessTokenExpiresAt
+      ).toISOString()
     );
     console.log("========================================");
 
     /*
-    Never display actual token values
+    Never return the actual token values.
     */
 
-    res.json({
+    return res.json({
       success: true,
+
       message:
         "QuickBooks connected successfully.",
-      realmId: realmId || null,
+
+      realmId:
+        realmId || null,
+
       access_token_received:
         !!tokenData.access_token,
+
       refresh_token_received:
         !!tokenData.refresh_token,
+
       access_token_expires_at:
         new Date(
           accessTokenExpiresAt
@@ -367,7 +392,9 @@ app.get("/auth/intuit/callback", async (req, res) => {
 
   } catch (error) {
     console.error("========================================");
-    console.error("QuickBooks OAuth error");
+    console.error(
+      "QuickBooks OAuth error"
+    );
 
     if (error.response) {
       console.error(
@@ -423,40 +450,51 @@ async function refreshQuickBooksToken() {
 
   try {
 
-    const response = await axios.post(
-      INTUIT_TOKEN_URL,
-      new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token:
-          quickbooksConnection.refreshToken
-      }).toString(),
-      {
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded",
-          "Authorization":
-            "Basic " +
-            Buffer.from(
-              INTUIT_CLIENT_ID +
-                ":" +
-                INTUIT_CLIENT_SECRET
-            ).toString("base64")
-        }
-      }
-    );
+    const response =
+      await axios.post(
+        INTUIT_TOKEN_URL,
 
-    const tokenData = response.data;
+        new URLSearchParams({
+          grant_type:
+            "refresh_token",
+
+          refresh_token:
+            quickbooksConnection.refreshToken
+        }).toString(),
+
+        {
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+
+            "Authorization":
+              "Basic " +
+              Buffer.from(
+                INTUIT_CLIENT_ID +
+                  ":" +
+                  INTUIT_CLIENT_SECRET
+              ).toString("base64")
+          }
+        }
+      );
+
+    const tokenData =
+      response.data;
 
     const expiresIn =
-      Number(tokenData.expires_in) || 3600;
+      Number(tokenData.expires_in) ||
+      3600;
+
+    /*
+    Update access token
+    */
 
     quickbooksConnection.accessToken =
       tokenData.access_token;
 
     /*
-    Intuit can rotate the refresh token.
-    If a new refresh token is returned,
-    save the new one.
+    Intuit may rotate the refresh token.
+    Save the new one if supplied.
     */
 
     if (tokenData.refresh_token) {
@@ -464,8 +502,13 @@ async function refreshQuickBooksToken() {
         tokenData.refresh_token;
     }
 
+    /*
+    Update expiration
+    */
+
     quickbooksConnection.accessTokenExpiresAt =
-      Date.now() + expiresIn * 1000;
+      Date.now() +
+      expiresIn * 1000;
 
     quickbooksConnection.connected =
       true;
@@ -479,19 +522,24 @@ async function refreshQuickBooksToken() {
   } catch (error) {
 
     console.error(
-      "QuickBooks token refresh failed:"
+      "QuickBooks token refresh failed."
     );
 
     if (error.response) {
       console.error(
+        "Status:",
         error.response.status
       );
 
       console.error(
+        "Response:",
         error.response.data
       );
     } else {
-      console.error(error.message);
+      console.error(
+        "Message:",
+        error.message
+      );
     }
 
     quickbooksConnection.connected =
@@ -549,6 +597,7 @@ app.get(
   (req, res) => {
 
     res.json({
+
       connected:
         quickbooksConnection.connected,
 
@@ -564,7 +613,8 @@ app.get(
       access_token_expires_at:
         quickbooksConnection.accessTokenExpiresAt
           ? new Date(
-              quickbooksConnection.accessTokenExpiresAt
+              quickbooksConnection
+                .accessTokenExpiresAt
             ).toISOString()
           : null,
 
@@ -576,7 +626,7 @@ app.get(
 
 /*
 ============================================================
-QUICKBOOKS COMPANY TEST
+QUICKBOOKS COMPANY INFORMATION TEST
 ============================================================
 
 This makes a REAL API request to QuickBooks.
@@ -598,11 +648,20 @@ app.get(
 
     try {
 
+      /*
+      Get a valid access token.
+      This automatically refreshes it if necessary.
+      */
+
       const accessToken =
         await getQuickBooksAccessToken();
 
       const realmId =
         quickbooksConnection.realmId;
+
+      /*
+      Call QuickBooks CompanyInfo endpoint.
+      */
 
       const response =
         await axios.get(
@@ -618,20 +677,48 @@ app.get(
           }
         );
 
-      const companyInfo =
-        response.data?.QueryResponse?.CompanyInfo?.[0];
+      /*
+      QuickBooks returns CompanyInfo directly.
+      */
 
-      res.json({
+      const companyInfo =
+        response.data?.CompanyInfo || null;
+
+      console.log("========================================");
+      console.log(
+        "QuickBooks CompanyInfo request successful."
+      );
+
+      if (companyInfo) {
+        console.log(
+          "Company:",
+          companyInfo.CompanyName ||
+            companyInfo.LegalName ||
+            "Name unavailable"
+        );
+      } else {
+        console.log(
+          "CompanyInfo was not present in response."
+        );
+      }
+
+      console.log("========================================");
+
+      return res.json({
         success: true,
+
         message:
           "Successfully connected to QuickBooks.",
-        company: companyInfo || null
+
+        company:
+          companyInfo
       });
 
     } catch (error) {
 
+      console.error("========================================");
       console.error(
-        "QuickBooks company API error:"
+        "QuickBooks company API error"
       );
 
       if (error.response) {
@@ -654,12 +741,17 @@ app.get(
         );
       }
 
-      res.status(
+      console.error("========================================");
+
+      return res.status(
         error.response?.status || 500
       ).json({
+
         success: false,
+
         error:
           "Unable to retrieve QuickBooks company information.",
+
         details:
           error.response?.data || null
       });
@@ -681,26 +773,35 @@ app.post(
 
       await refreshQuickBooksToken();
 
-      res.json({
+      return res.json({
+
         success: true,
+
         message:
           "QuickBooks access token refreshed successfully.",
+
         access_token_available:
           !!quickbooksConnection.accessToken,
+
         refresh_token_available:
           !!quickbooksConnection.refreshToken,
+
         access_token_expires_at:
-          quickbooksConnection.accessTokenExpiresAt
+          quickbooksConnection
+            .accessTokenExpiresAt
             ? new Date(
-                quickbooksConnection.accessTokenExpiresAt
+                quickbooksConnection
+                  .accessTokenExpiresAt
               ).toISOString()
             : null
       });
 
     } catch (error) {
 
-      res.status(500).json({
+      return res.status(500).json({
+
         success: false,
+
         error:
           "QuickBooks token refresh failed."
       });
