@@ -10,9 +10,9 @@
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {
-    "dotenv": "^16.4.7",
-    "express": "^5.1.0",
-    "cors": "^2.8.5"
-  }
+"dependencies": {
+  "dotenv": "^16.4.7",
+  "express": "^5.1.0",
+  "cors": "^2.8.5",
+  "axios": "^1.11.0"
 }
