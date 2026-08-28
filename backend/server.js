@@ -3,18 +3,10 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
+const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(express.json());
-
-const {
-  INTUIT_CLIENT_ID,
-  INTUIT_CLIENT_SECRET,
-  INTUIT_REDIRECT_URI
-} = process.env;
 
 /*
 ============================================================
@@ -22,35 +14,57 @@ CONFIGURATION
 ============================================================
 */
 
-const INTUIT_TOKEN_URL =
-  "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
+const {
+  INTUIT_CLIENT_ID,
+  INTUIT_CLIENT_SECRET,
+  INTUIT_REDIRECT_URI,
+  DATABASE_URL
+} = process.env;
 
-const INTUIT_API_BASE =
-  "https://quickbooks.api.intuit.com";
+app.use(cors());
+app.use(express.json());
 
 /*
 ============================================================
-TEMPORARY QUICKBOOKS CONNECTION STORAGE
-============================================================
-
-This is temporary.
-
-The tokens are stored only while this Render instance
-is running.
-
-Later we will move this to persistent encrypted storage.
-
+DATABASE
 ============================================================
 */
 
-let quickbooksConnection = {
-  connected: false,
-  realmId: null,
-  accessToken: null,
-  refreshToken: null,
-  accessTokenExpiresAt: null,
-  connectedAt: null
-};
+if (!DATABASE_URL) {
+  console.error("DATABASE_URL is missing.");
+  process.exit(1);
+}
+
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  },
+  max: 5
+});
+
+/*
+============================================================
+DATABASE INITIALIZATION
+============================================================
+*/
+
+async function initializeDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quickbooks_connection (
+      id INTEGER PRIMARY KEY,
+      realm_id TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      access_token_expires_at TIMESTAMPTZ,
+      refresh_token_expires_at TIMESTAMPTZ,
+      connected_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  console.log("PostgreSQL database initialized.");
+}
 
 /*
 ============================================================
@@ -73,29 +87,11 @@ console.log(
   "INTUIT_REDIRECT_URI:",
   INTUIT_REDIRECT_URI || "MISSING"
 );
+console.log(
+  "DATABASE_URL:",
+  DATABASE_URL ? "SET" : "MISSING"
+);
 console.log("========================================");
-
-/*
-============================================================
-INTUIT CONFIGURATION VALIDATION
-============================================================
-*/
-
-function validateIntuitConfiguration() {
-  if (!INTUIT_CLIENT_ID) {
-    return "INTUIT_CLIENT_ID is missing.";
-  }
-
-  if (!INTUIT_CLIENT_SECRET) {
-    return "INTUIT_CLIENT_SECRET is missing.";
-  }
-
-  if (!INTUIT_REDIRECT_URI) {
-    return "INTUIT_REDIRECT_URI is missing.";
-  }
-
-  return null;
-}
 
 /*
 ============================================================
@@ -107,7 +103,7 @@ app.get("/", (req, res) => {
   res.json({
     status: "online",
     service: "Lesik Receipt Automation",
-    version: "1.2.0"
+    version: "1.0.0"
   });
 });
 
@@ -117,16 +113,30 @@ HEALTH CHECK
 ============================================================
 */
 
-app.get("/health", (req, res) => {
-  res.json({
-    status: "healthy",
-    timestamp: new Date().toISOString()
-  });
+app.get("/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+
+    res.json({
+      status: "healthy",
+      database: "connected",
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("Health check database error:", error.message);
+
+    res.status(500).json({
+      status: "unhealthy",
+      database: "disconnected",
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 /*
 ============================================================
-INTUIT CONFIGURATION DEBUG
+INTUIT CONFIGURATION DIAGNOSTIC
 ============================================================
 */
 
@@ -137,86 +147,156 @@ app.get("/debug/intuit", (req, res) => {
     redirect_uri: INTUIT_REDIRECT_URI || null,
     redirect_uri_length: INTUIT_REDIRECT_URI
       ? INTUIT_REDIRECT_URI.length
-      : null
+      : null,
+    database_url_present: !!DATABASE_URL
   });
 });
 
 /*
 ============================================================
-INTUIT OAUTH URL DEBUG
+QUICKBOOKS CONNECTION STATUS
 ============================================================
 */
 
-app.get("/debug/intuit-url", (req, res) => {
-  const configError = validateIntuitConfiguration();
+app.get("/quickbooks/status", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        realm_id,
+        connected_at,
+        updated_at,
+        access_token_expires_at,
+        refresh_token_expires_at
+      FROM quickbooks_connection
+      WHERE id = 1
+      LIMIT 1
+    `);
 
-  if (configError) {
-    return res.status(500).json({
-      success: false,
-      error: configError
+    if (result.rows.length === 0) {
+      return res.json({
+        connected: false,
+        message: "QuickBooks is not connected."
+      });
+    }
+
+    const connection = result.rows[0];
+
+    res.json({
+      connected: true,
+      realmId: connection.realm_id,
+      connected_at: connection.connected_at,
+      updated_at: connection.updated_at,
+      access_token_expires_at:
+        connection.access_token_expires_at,
+      refresh_token_expires_at:
+        connection.refresh_token_expires_at
+    });
+
+  } catch (error) {
+    console.error(
+      "QuickBooks status error:",
+      error.message
+    );
+
+    res.status(500).json({
+      connected: false,
+      error: "Unable to check QuickBooks connection."
     });
   }
-
-  const authParams = new URLSearchParams({
-    client_id: INTUIT_CLIENT_ID,
-    response_type: "code",
-    scope: "com.intuit.quickbooks.accounting",
-    redirect_uri: INTUIT_REDIRECT_URI,
-    state: "diagnostic-test"
-  });
-
-  const authUrl =
-    "https://appcenter.intuit.com/connect/oauth2?" +
-    authParams.toString();
-
-  res.json({
-    redirect_uri_from_environment: INTUIT_REDIRECT_URI,
-    redirect_uri_length: INTUIT_REDIRECT_URI.length,
-    generated_oauth_url: authUrl
-  });
 });
 
 /*
 ============================================================
-START QUICKBOOKS / INTUIT AUTHORIZATION
+START QUICKBOOKS AUTHORIZATION
 ============================================================
 */
 
-app.get("/auth/intuit", (req, res) => {
-  const configError = validateIntuitConfiguration();
-
-  if (configError) {
-    return res.status(500).send(configError);
+app.get("/auth/intuit", async (req, res) => {
+  if (!INTUIT_CLIENT_ID) {
+    return res.status(500).send(
+      "INTUIT_CLIENT_ID is missing from the server environment."
+    );
   }
 
-  const state =
-    Math.random().toString(36).substring(2) +
-    Date.now().toString(36);
+  if (!INTUIT_CLIENT_SECRET) {
+    return res.status(500).send(
+      "INTUIT_CLIENT_SECRET is missing from the server environment."
+    );
+  }
 
-  const authParams = new URLSearchParams({
-    client_id: INTUIT_CLIENT_ID,
-    response_type: "code",
-    scope: "com.intuit.quickbooks.accounting",
-    redirect_uri: INTUIT_REDIRECT_URI,
-    state: state
-  });
+  if (!INTUIT_REDIRECT_URI) {
+    return res.status(500).send(
+      "INTUIT_REDIRECT_URI is missing from the server environment."
+    );
+  }
 
-  const authUrl =
-    "https://appcenter.intuit.com/connect/oauth2?" +
-    authParams.toString();
+  try {
+    /*
+    Generate a state value and store it in PostgreSQL.
+    This protects the OAuth flow from CSRF attacks.
+    */
 
-  console.log("========================================");
-  console.log("Starting Intuit OAuth");
-  console.log("Redirect URI:");
-  console.log(INTUIT_REDIRECT_URI);
-  console.log("========================================");
+    const state = require("crypto")
+      .randomBytes(32)
+      .toString("hex");
 
-  res.redirect(authUrl);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oauth_state (
+        id INTEGER PRIMARY KEY,
+        state TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(
+      `
+      INSERT INTO oauth_state (id, state, created_at)
+      VALUES (1, $1, NOW())
+      ON CONFLICT (id)
+      DO UPDATE SET
+        state = EXCLUDED.state,
+        created_at = NOW()
+      `,
+      [state]
+    );
+
+    const authParams = new URLSearchParams({
+      client_id: INTUIT_CLIENT_ID,
+      response_type: "code",
+      scope: "com.intuit.quickbooks.accounting",
+      redirect_uri: INTUIT_REDIRECT_URI,
+      state: state
+    });
+
+    const authUrl =
+      "https://appcenter.intuit.com/connect/oauth2?" +
+      authParams.toString();
+
+    console.log("========================================");
+    console.log("Starting QuickBooks OAuth");
+    console.log(
+      "Redirect URI:",
+      INTUIT_REDIRECT_URI
+    );
+    console.log("========================================");
+
+    res.redirect(authUrl);
+
+  } catch (error) {
+    console.error(
+      "OAuth start error:",
+      error.message
+    );
+
+    res.status(500).send(
+      "Unable to start QuickBooks authorization."
+    );
+  }
 });
 
 /*
 ============================================================
-QUICKBOOKS / INTUIT OAUTH CALLBACK
+QUICKBOOKS OAUTH CALLBACK
 ============================================================
 */
 
@@ -230,12 +310,12 @@ app.get("/auth/intuit/callback", async (req, res) => {
   } = req.query;
 
   /*
-  Handle Intuit OAuth errors
+  Handle an error returned by Intuit
   */
 
   if (error) {
     console.error("========================================");
-    console.error("Intuit OAuth returned an error");
+    console.error("Intuit OAuth error");
     console.error("Error:", error);
     console.error(
       "Description:",
@@ -252,7 +332,7 @@ app.get("/auth/intuit/callback", async (req, res) => {
   }
 
   /*
-  Authorization code required
+  Require authorization code
   */
 
   if (!code) {
@@ -263,31 +343,90 @@ app.get("/auth/intuit/callback", async (req, res) => {
   }
 
   /*
-  Validate configuration
+  Require realm ID
   */
 
-  const configError =
-    validateIntuitConfiguration();
-
-  if (configError) {
-    return res.status(500).json({
+  if (!realmId) {
+    return res.status(400).json({
       success: false,
-      error: configError
+      error: "QuickBooks company realm ID missing."
     });
   }
 
+  /*
+  Validate OAuth state
+  */
+
   try {
+    const stateResult = await pool.query(
+      `
+      SELECT state
+      FROM oauth_state
+      WHERE id = 1
+      LIMIT 1
+      `
+    );
+
+    if (
+      stateResult.rows.length === 0 ||
+      stateResult.rows[0].state !== state
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid OAuth state."
+      });
+    }
+
     /*
-    Exchange authorization code for tokens
+    Delete used state.
     */
 
+    await pool.query(
+      "DELETE FROM oauth_state WHERE id = 1"
+    );
+
+  } catch (error) {
+    console.error(
+      "OAuth state validation error:",
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Unable to validate OAuth state."
+    });
+  }
+
+  /*
+  Check environment
+  */
+
+  if (
+    !INTUIT_CLIENT_ID ||
+    !INTUIT_CLIENT_SECRET ||
+    !INTUIT_REDIRECT_URI
+  ) {
+    return res.status(500).json({
+      success: false,
+      error:
+        "Intuit credentials are missing from server environment."
+    });
+  }
+
+  /*
+  Exchange authorization code for tokens
+  */
+
+  try {
     const tokenResponse = await axios.post(
-      INTUIT_TOKEN_URL,
+      "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+
       new URLSearchParams({
         grant_type: "authorization_code",
         code: code,
         redirect_uri: INTUIT_REDIRECT_URI
       }).toString(),
+
       {
         headers: {
           "Content-Type":
@@ -297,104 +436,110 @@ app.get("/auth/intuit/callback", async (req, res) => {
             "Basic " +
             Buffer.from(
               INTUIT_CLIENT_ID +
-                ":" +
-                INTUIT_CLIENT_SECRET
+              ":" +
+              INTUIT_CLIENT_SECRET
             ).toString("base64")
         }
       }
     );
 
-    const tokenData =
-      tokenResponse.data;
+    const tokenData = tokenResponse.data;
 
     /*
-    Determine expiration
+    Calculate token expiration times.
     */
-
-    const expiresIn =
-      Number(tokenData.expires_in) || 3600;
 
     const accessTokenExpiresAt =
-      Date.now() +
-      expiresIn * 1000;
+      tokenData.expires_in
+        ? new Date(
+            Date.now() +
+            tokenData.expires_in * 1000
+          )
+        : null;
+
+    const refreshTokenExpiresAt =
+      tokenData.x_refresh_token_expires_in
+        ? new Date(
+            Date.now() +
+            tokenData.x_refresh_token_expires_in * 1000
+          )
+        : null;
 
     /*
-    Store QuickBooks connection
+    Save QuickBooks connection to PostgreSQL.
     */
 
-    quickbooksConnection = {
-      connected: true,
+    await pool.query(
+      `
+      INSERT INTO quickbooks_connection (
+        id,
+        realm_id,
+        access_token,
+        refresh_token,
+        access_token_expires_at,
+        refresh_token_expires_at,
+        connected_at,
+        updated_at
+      )
+      VALUES (
+        1,
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        NOW(),
+        NOW()
+      )
 
-      realmId:
-        realmId || null,
+      ON CONFLICT (id)
+      DO UPDATE SET
+        realm_id = EXCLUDED.realm_id,
+        access_token = EXCLUDED.access_token,
+        refresh_token = EXCLUDED.refresh_token,
+        access_token_expires_at =
+          EXCLUDED.access_token_expires_at,
+        refresh_token_expires_at =
+          EXCLUDED.refresh_token_expires_at,
+        updated_at = NOW()
+      `,
 
-      accessToken:
-        tokenData.access_token || null,
-
-      refreshToken:
-        tokenData.refresh_token || null,
-
-      accessTokenExpiresAt:
+      [
+        realmId,
+        tokenData.access_token,
+        tokenData.refresh_token,
         accessTokenExpiresAt,
-
-      connectedAt:
-        new Date().toISOString()
-    };
+        refreshTokenExpiresAt
+      ]
+    );
 
     console.log("========================================");
+    console.log("QuickBooks OAuth successful");
+    console.log("Realm ID:", realmId);
     console.log(
-      "QuickBooks OAuth successful"
-    );
-    console.log(
-      "Realm ID:",
-      realmId || "MISSING"
-    );
-    console.log(
-      "Access token received:",
+      "Access token saved:",
       !!tokenData.access_token
     );
     console.log(
-      "Refresh token received:",
+      "Refresh token saved:",
       !!tokenData.refresh_token
-    );
-    console.log(
-      "Access token expires:",
-      new Date(
-        accessTokenExpiresAt
-      ).toISOString()
     );
     console.log("========================================");
 
-    /*
-    Never return the actual token values.
-    */
-
-    return res.json({
+    res.json({
       success: true,
-
       message:
-        "QuickBooks connected successfully.",
-
-      realmId:
-        realmId || null,
-
-      access_token_received:
+        "QuickBooks connected and securely saved.",
+      realmId: realmId,
+      access_token_saved:
         !!tokenData.access_token,
-
-      refresh_token_received:
-        !!tokenData.refresh_token,
-
-      access_token_expires_at:
-        new Date(
-          accessTokenExpiresAt
-        ).toISOString()
+      refresh_token_saved:
+        !!tokenData.refresh_token
     });
 
   } catch (error) {
     console.error("========================================");
-    console.error(
-      "QuickBooks OAuth error"
-    );
+    console.error("QuickBooks OAuth error");
 
     if (error.response) {
       console.error(
@@ -425,247 +570,194 @@ app.get("/auth/intuit/callback", async (req, res) => {
 
 /*
 ============================================================
-REFRESH QUICKBOOKS ACCESS TOKEN
+GET SAVED QUICKBOOKS CONNECTION
 ============================================================
 */
 
-async function refreshQuickBooksToken() {
+async function getQuickBooksConnection() {
+  const result = await pool.query(`
+    SELECT *
+    FROM quickbooks_connection
+    WHERE id = 1
+    LIMIT 1
+  `);
 
-  if (!quickbooksConnection.refreshToken) {
-    throw new Error(
-      "No QuickBooks refresh token is available."
-    );
+  if (result.rows.length === 0) {
+    return null;
   }
 
-  const configError =
-    validateIntuitConfiguration();
-
-  if (configError) {
-    throw new Error(configError);
-  }
-
-  console.log(
-    "Refreshing QuickBooks access token..."
-  );
-
-  try {
-
-    const response =
-      await axios.post(
-        INTUIT_TOKEN_URL,
-
-        new URLSearchParams({
-          grant_type:
-            "refresh_token",
-
-          refresh_token:
-            quickbooksConnection.refreshToken
-        }).toString(),
-
-        {
-          headers: {
-            "Content-Type":
-              "application/x-www-form-urlencoded",
-
-            "Authorization":
-              "Basic " +
-              Buffer.from(
-                INTUIT_CLIENT_ID +
-                  ":" +
-                  INTUIT_CLIENT_SECRET
-              ).toString("base64")
-          }
-        }
-      );
-
-    const tokenData =
-      response.data;
-
-    const expiresIn =
-      Number(tokenData.expires_in) ||
-      3600;
-
-    /*
-    Update access token
-    */
-
-    quickbooksConnection.accessToken =
-      tokenData.access_token;
-
-    /*
-    Intuit may rotate the refresh token.
-    Save the new one if supplied.
-    */
-
-    if (tokenData.refresh_token) {
-      quickbooksConnection.refreshToken =
-        tokenData.refresh_token;
-    }
-
-    /*
-    Update expiration
-    */
-
-    quickbooksConnection.accessTokenExpiresAt =
-      Date.now() +
-      expiresIn * 1000;
-
-    quickbooksConnection.connected =
-      true;
-
-    console.log(
-      "QuickBooks access token refreshed successfully."
-    );
-
-    return quickbooksConnection.accessToken;
-
-  } catch (error) {
-
-    console.error(
-      "QuickBooks token refresh failed."
-    );
-
-    if (error.response) {
-      console.error(
-        "Status:",
-        error.response.status
-      );
-
-      console.error(
-        "Response:",
-        error.response.data
-      );
-    } else {
-      console.error(
-        "Message:",
-        error.message
-      );
-    }
-
-    quickbooksConnection.connected =
-      false;
-
-    throw error;
-  }
+  return result.rows[0];
 }
 
 /*
 ============================================================
-GET VALID QUICKBOOKS ACCESS TOKEN
+REFRESH QUICKBOOKS ACCESS TOKEN
 ============================================================
 */
 
-async function getQuickBooksAccessToken() {
+async function refreshQuickBooksToken(connection) {
+  if (!connection) {
+    throw new Error(
+      "QuickBooks is not connected."
+    );
+  }
 
-  if (
-    !quickbooksConnection.accessToken ||
-    !quickbooksConnection.refreshToken
-  ) {
+  const response = await axios.post(
+    "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+
+    new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: connection.refresh_token
+    }).toString(),
+
+    {
+      headers: {
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+
+        "Authorization":
+          "Basic " +
+          Buffer.from(
+            INTUIT_CLIENT_ID +
+            ":" +
+            INTUIT_CLIENT_SECRET
+          ).toString("base64")
+      }
+    }
+  );
+
+  const tokenData = response.data;
+
+  const accessTokenExpiresAt =
+    tokenData.expires_in
+      ? new Date(
+          Date.now() +
+          tokenData.expires_in * 1000
+        )
+      : null;
+
+  /*
+  Intuit may return a new refresh token.
+  If it doesn't, keep the existing one.
+  */
+
+  const refreshToken =
+    tokenData.refresh_token ||
+    connection.refresh_token;
+
+  const refreshTokenExpiresAt =
+    tokenData.x_refresh_token_expires_in
+      ? new Date(
+          Date.now() +
+          tokenData.x_refresh_token_expires_in * 1000
+        )
+      : connection.refresh_token_expires_at;
+
+  await pool.query(
+    `
+    UPDATE quickbooks_connection
+    SET
+      access_token = $1,
+      refresh_token = $2,
+      access_token_expires_at = $3,
+      refresh_token_expires_at = $4,
+      updated_at = NOW()
+    WHERE id = 1
+    `,
+    [
+      tokenData.access_token,
+      refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt
+    ]
+  );
+
+  console.log(
+    "QuickBooks access token refreshed."
+  );
+
+  return {
+    ...connection,
+    access_token: tokenData.access_token,
+    refresh_token: refreshToken,
+    access_token_expires_at:
+      accessTokenExpiresAt,
+    refresh_token_expires_at:
+      refreshTokenExpiresAt
+  };
+}
+
+/*
+============================================================
+GET A VALID QUICKBOOKS ACCESS TOKEN
+============================================================
+*/
+
+async function getValidAccessToken() {
+  let connection =
+    await getQuickBooksConnection();
+
+  if (!connection) {
     throw new Error(
       "QuickBooks is not connected. Authorize QuickBooks first."
     );
   }
 
   /*
-  Refresh five minutes before expiration.
+  Refresh if the access token expires within
+  the next five minutes.
   */
 
-  const refreshBuffer =
+  const expiresAt =
+    connection.access_token_expires_at
+      ? new Date(
+          connection.access_token_expires_at
+        ).getTime()
+      : 0;
+
+  const fiveMinutes =
     5 * 60 * 1000;
 
-  const tokenNeedsRefresh =
-    !quickbooksConnection.accessTokenExpiresAt ||
-    Date.now() >=
-      quickbooksConnection.accessTokenExpiresAt -
-        refreshBuffer;
-
-  if (tokenNeedsRefresh) {
-    return await refreshQuickBooksToken();
+  if (
+    !expiresAt ||
+    expiresAt <= Date.now() + fiveMinutes
+  ) {
+    connection =
+      await refreshQuickBooksToken(
+        connection
+      );
   }
 
-  return quickbooksConnection.accessToken;
+  return connection.access_token;
 }
 
 /*
 ============================================================
-QUICKBOOKS CONNECTION STATUS
-============================================================
-*/
-
-app.get(
-  "/quickbooks/status",
-  (req, res) => {
-
-    res.json({
-
-      connected:
-        quickbooksConnection.connected,
-
-      realmId:
-        quickbooksConnection.realmId,
-
-      access_token_available:
-        !!quickbooksConnection.accessToken,
-
-      refresh_token_available:
-        !!quickbooksConnection.refreshToken,
-
-      access_token_expires_at:
-        quickbooksConnection.accessTokenExpiresAt
-          ? new Date(
-              quickbooksConnection
-                .accessTokenExpiresAt
-            ).toISOString()
-          : null,
-
-      connected_at:
-        quickbooksConnection.connectedAt
-    });
-  }
-);
-
-/*
-============================================================
-QUICKBOOKS COMPANY INFORMATION TEST
-============================================================
-
-This makes a REAL API request to QuickBooks.
-
+QUICKBOOKS COMPANY INFORMATION
 ============================================================
 */
 
 app.get(
   "/quickbooks/company",
   async (req, res) => {
-
-    if (!quickbooksConnection.realmId) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "QuickBooks is not connected. Authorize QuickBooks first."
-      });
-    }
-
     try {
+      const connection =
+        await getQuickBooksConnection();
 
-      /*
-      Get a valid access token.
-      This automatically refreshes it if necessary.
-      */
+      if (!connection) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "QuickBooks is not connected. Authorize QuickBooks first."
+        });
+      }
 
       const accessToken =
-        await getQuickBooksAccessToken();
+        await getValidAccessToken();
 
-      const realmId =
-        quickbooksConnection.realmId;
-
-      /*
-      Call QuickBooks CompanyInfo endpoint.
-      */
-
-      const response =
+      const companyResponse =
         await axios.get(
-          `${INTUIT_API_BASE}/v3/company/${realmId}/companyinfo/${realmId}`,
+          `https://quickbooks.api.intuit.com/v3/company/${connection.realm_id}/companyinfo/${connection.realm_id}`,
           {
             headers: {
               Authorization:
@@ -677,83 +769,28 @@ app.get(
           }
         );
 
-      /*
-      QuickBooks returns CompanyInfo directly.
-      */
+      const company =
+        companyResponse.data
+          ?.CompanyInfo;
 
-      const companyInfo =
-        response.data?.CompanyInfo || null;
-
-      console.log("========================================");
-      console.log(
-        "QuickBooks CompanyInfo request successful."
-      );
-
-      if (companyInfo) {
-        console.log(
-          "Company:",
-          companyInfo.CompanyName ||
-            companyInfo.LegalName ||
-            "Name unavailable"
-        );
-      } else {
-        console.log(
-          "CompanyInfo was not present in response."
-        );
-      }
-
-      console.log("========================================");
-
-      return res.json({
+      res.json({
         success: true,
-
         message:
           "Successfully connected to QuickBooks.",
-
-        company:
-          companyInfo
+        company: company || null
       });
 
     } catch (error) {
-
-      console.error("========================================");
       console.error(
-        "QuickBooks company API error"
+        "QuickBooks company error:",
+        error.response?.data ||
+        error.message
       );
 
-      if (error.response) {
-
-        console.error(
-          "Status:",
-          error.response.status
-        );
-
-        console.error(
-          "Response:",
-          error.response.data
-        );
-
-      } else {
-
-        console.error(
-          "Message:",
-          error.message
-        );
-      }
-
-      console.error("========================================");
-
-      return res.status(
-        error.response?.status || 500
-      ).json({
-
+      res.status(500).json({
         success: false,
-
         error:
-          "Unable to retrieve QuickBooks company information.",
-
-        details:
-          error.response?.data || null
+          "Unable to retrieve QuickBooks company information."
       });
     }
   }
@@ -761,49 +798,72 @@ app.get(
 
 /*
 ============================================================
-MANUAL TOKEN REFRESH TEST
+QUICKBOOKS API TEST
 ============================================================
 */
 
-app.post(
-  "/quickbooks/refresh",
+app.get(
+  "/quickbooks/test",
   async (req, res) => {
-
     try {
+      const connection =
+        await getQuickBooksConnection();
 
-      await refreshQuickBooksToken();
+      if (!connection) {
+        return res.status(400).json({
+          success: false,
+          connected: false,
+          error:
+            "QuickBooks is not connected."
+        });
+      }
 
-      return res.json({
+      const accessToken =
+        await getValidAccessToken();
 
+      /*
+      Query the company information endpoint
+      as a live API connection test.
+      */
+
+      const response =
+        await axios.get(
+          `https://quickbooks.api.intuit.com/v3/company/${connection.realm_id}/companyinfo/${connection.realm_id}`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${accessToken}`,
+
+              Accept:
+                "application/json"
+            }
+          }
+        );
+
+      res.json({
         success: true,
-
-        message:
-          "QuickBooks access token refreshed successfully.",
-
-        access_token_available:
-          !!quickbooksConnection.accessToken,
-
-        refresh_token_available:
-          !!quickbooksConnection.refreshToken,
-
-        access_token_expires_at:
-          quickbooksConnection
-            .accessTokenExpiresAt
-            ? new Date(
-                quickbooksConnection
-                  .accessTokenExpiresAt
-              ).toISOString()
-            : null
+        connected: true,
+        realmId:
+          connection.realm_id,
+        api_working: true,
+        company_name:
+          response.data?.CompanyInfo
+            ?.CompanyName || null
       });
 
     } catch (error) {
+      console.error(
+        "QuickBooks API test error:",
+        error.response?.data ||
+        error.message
+      );
 
-      return res.status(500).json({
-
+      res.status(500).json({
         success: false,
-
+        connected: false,
+        api_working: false,
         error:
-          "QuickBooks token refresh failed."
+          "QuickBooks API test failed."
       });
     }
   }
@@ -815,10 +875,24 @@ START SERVER
 ============================================================
 */
 
-app.listen(PORT, () => {
+async function startServer() {
+  try {
+    await initializeDatabase();
 
-  console.log(
-    `Lesik Receipt Automation backend running on port ${PORT}`
-  );
+    app.listen(PORT, () => {
+      console.log(
+        `Lesik Receipt Automation backend running on port ${PORT}`
+      );
+    });
 
-});
+  } catch (error) {
+    console.error(
+      "Unable to start application:",
+      error
+    );
+
+    process.exit(1);
+  }
+}
+
+startServer();
