@@ -65,7 +65,7 @@ app.get("/health", (req, res) => {
 
 /*
 ============================================================
-TEMPORARY INTUIT OAUTH DIAGNOSTIC
+INTUIT ENVIRONMENT DIAGNOSTIC
 ============================================================
 */
 
@@ -77,6 +77,46 @@ app.get("/debug/intuit", (req, res) => {
     redirect_uri_length: INTUIT_REDIRECT_URI
       ? INTUIT_REDIRECT_URI.length
       : null
+  });
+});
+
+/*
+============================================================
+INTUIT OAUTH URL DIAGNOSTIC
+============================================================
+*/
+
+app.get("/debug/intuit-url", (req, res) => {
+  if (!INTUIT_CLIENT_ID) {
+    return res.status(500).json({
+      error: "INTUIT_CLIENT_ID is missing."
+    });
+  }
+
+  if (!INTUIT_REDIRECT_URI) {
+    return res.status(500).json({
+      error: "INTUIT_REDIRECT_URI is missing."
+    });
+  }
+
+  const state = "diagnostic-test";
+
+  const authParams = new URLSearchParams({
+    client_id: INTUIT_CLIENT_ID,
+    response_type: "code",
+    scope: "com.intuit.quickbooks.accounting",
+    redirect_uri: INTUIT_REDIRECT_URI,
+    state: state
+  });
+
+  const authUrl =
+    "https://appcenter.intuit.com/connect/oauth2?" +
+    authParams.toString();
+
+  res.json({
+    redirect_uri_from_environment: INTUIT_REDIRECT_URI,
+    redirect_uri_length: INTUIT_REDIRECT_URI.length,
+    generated_oauth_url: authUrl
   });
 });
 
@@ -151,7 +191,10 @@ app.get("/auth/intuit/callback", async (req, res) => {
     console.error("========================================");
     console.error("Intuit OAuth returned an error");
     console.error("Error:", error);
-    console.error("Description:", error_description || "None");
+    console.error(
+      "Description:",
+      error_description || "None"
+    );
     console.error("========================================");
 
     return res.status(400).json({
@@ -173,20 +216,22 @@ app.get("/auth/intuit/callback", async (req, res) => {
   }
 
   /*
-  Make sure the required environment variables exist
+  Make sure required environment variables exist
   */
 
   if (!INTUIT_CLIENT_ID || !INTUIT_CLIENT_SECRET) {
     return res.status(500).json({
       success: false,
-      error: "Intuit client credentials are missing from server environment."
+      error:
+        "Intuit client credentials are missing from server environment."
     });
   }
 
   if (!INTUIT_REDIRECT_URI) {
     return res.status(500).json({
       success: false,
-      error: "INTUIT_REDIRECT_URI is missing from server environment."
+      error:
+        "INTUIT_REDIRECT_URI is missing from server environment."
     });
   }
 
@@ -204,11 +249,14 @@ app.get("/auth/intuit/callback", async (req, res) => {
       }).toString(),
       {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type":
+            "application/x-www-form-urlencoded",
           "Authorization":
             "Basic " +
             Buffer.from(
-              INTUIT_CLIENT_ID + ":" + INTUIT_CLIENT_SECRET
+              INTUIT_CLIENT_ID +
+              ":" +
+              INTUIT_CLIENT_SECRET
             ).toString("base64")
         }
       }
@@ -229,12 +277,13 @@ app.get("/auth/intuit/callback", async (req, res) => {
 
     /*
     IMPORTANT:
-    We are NOT displaying the actual tokens.
+    Never display the actual tokens.
     */
 
     res.json({
       success: true,
-      message: "QuickBooks connected successfully.",
+      message:
+        "QuickBooks connected successfully.",
       realmId: realmId || null,
       access_token_received:
         !!tokenResponse.data.access_token,
@@ -267,7 +316,8 @@ app.get("/auth/intuit/callback", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      error: "QuickBooks authorization failed."
+      error:
+        "QuickBooks authorization failed."
     });
   }
 });
