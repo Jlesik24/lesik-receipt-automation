@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opportunity Communications - Privacy Policy</title>
+    <style>
+        body { max-width: 46em; margin: 0 auto; padding: 1em; line-height: 1.5; color: #111111; background: #ffffff; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #555555; padding: 0.4em 0.6em; text-align: left; vertical-align: top; }
+        th { background: #eeeeee; }
+        a { color: #0b3d91; }
+    </style>
+</head>
+<body>
+    <h1>Opportunity Communications - Privacy Policy</h1>
+
+    <p><strong>Effective Date:</strong> October 9, 2026</p>
+
+    <p>
+        <strong>App name:</strong> Opportunity Communications<br>
+        <strong>Meta App ID:</strong> 1113951697774906<br>
+        <strong>Operated by:</strong> Lesik Electrical Services LLC
+    </p>
+
+    <p>
+        See also: <a href="opportunity-data-deletion.html">Opportunity Communications - Data Deletion Instructions</a>
+    </p>
+
+    <h2>1. What This App Is</h2>
+    <p>
+        Opportunity Communications is a private tool used by one operator. The
+        operator uses it to publish posts to Facebook Pages that the operator
+        administers. It is part of the operator's internal business software.
+        The internal software prepares posts and is designed to publish them only
+        on the operator's instruction or approval.
+    </p>
+    <p>
+        The app has no public application interface and no public sign-up. Its
+        privacy and deletion information is published on this public website.
+        Only the operator authorizes Facebook access, through a manual setup
+        process; the app does not offer "Log in with Facebook" to anyone.
+    </p>
+
+    <h2>2. Facebook Pages the App Manages</h2>
+    <ul>
+        <li>Skyview Amusements Pool Leagues</li>
+        <li>Last Rack Billiards</li>
+    </ul>
+
+    <h2>3. Permissions the App Uses</h2>
+    <p>
+        The table lists the permissions that the app's setup and publishing code
+        is written to use.
+    </p>
+    <table>
+        <thead>
+            <tr><th scope="col">Permission</th><th scope="col">What it is used for</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>pages_show_list</td>
+                <td>
+                    During setup, to list the Pages returned for the operator's account
+                    so the operator can choose the two Pages above.
+                </td>
+            </tr>
+            <tr>
+                <td>pages_manage_posts</td>
+                <td>To publish text posts to one of the two Pages. Photo publishing is not currently available through the software.</td>
+            </tr>
+            <tr>
+                <td>pages_read_engagement</td>
+                <td>
+                    To read the Page's own ID and name before each publication, to check
+                    that the app is connected to the intended Page; and to read up to ten
+                    of the Page's most recent published posts (post ID, post text,
+                    creation time) before each publication, and again when a publication
+                    result is uncertain, to help identify whether the post was published
+                    and reduce the risk of duplicate publication.
+                </td>
+            </tr>
+            <tr>
+                <td>public_profile</td>
+                <td>
+                    Part of the operator's own Facebook authorization. The software
+                    contains no request for profile fields.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>4. What the App Reads From Facebook</h2>
+    <p>The app is designed to read the following:</p>
+    <ul>
+        <li>Before each publication: the ID and name of the Page being published to.</li>
+        <li>
+            Before each publication, the app reads up to ten of the Page's most recent
+            published posts, including posts made outside this app, to establish a
+            baseline. It may read them again to reconcile an uncertain publication
+            result. Returned post IDs, text and creation times are compared in
+            memory; the returned list is not retained, although the identified
+            published post ID is recorded.
+        </li>
+        <li>After a publication: the ID that Facebook returns for the new post.</li>
+        <li>
+            During setup, a script run by the operator retrieves the IDs, names,
+            tasks and available access tokens for Pages returned for the operator's
+            account. It stores configuration for the two selected Pages. The app
+            secret and user access tokens are processed during setup but are not
+            stored.
+        </li>
+        <li>
+            After a post is created, the software is designed to check whether a
+            logged-out visitor can see it. It requests the post's public Facebook
+            web pages without logging in and without sending any access token,
+            shortly after publication and again over the following 24 hours; its
+            schedule is configured for at most twelve automatic requests per post.
+            The operator can also run such a check on request. The software keeps
+            the result of each check and a short note of what was found; it is
+            designed not to keep the fetched pages.
+        </li>
+    </ul>
+
+    <h2>5. What the App Does Not Request</h2>
+    <p>
+        The app does not specifically request Facebook user profiles, visitor
+        identities, follower lists, comments or reactions. Page post text may
+        contain people's names, and
+        league records used to prepare posts may also contain personal
+        information, as explained in section 6.
+    </p>
+    <p>The software contains no requests for any of the following:</p>
+    <ul>
+        <li>Email addresses, friend lists or other account details of Facebook users.</li>
+        <li>Comments, reactions or shares on posts.</li>
+        <li>Page insights or other audience statistics.</li>
+        <li>Messenger conversations, Instagram accounts, Groups or advertising accounts.</li>
+    </ul>
+    <p>
+        The software has no webhook or other endpoint for receiving notifications
+        from Meta.
+    </p>
+
+    <h2>6. Content of Posts and People Named in Them</h2>
+    <p>
+        The posts the app publishes are written by or for the operator. Pool league
+        result posts can include the names of league players and teams together
+        with their match results and achievements. That information originates
+        from the leagues' records in CompuSport, a league-management service, and
+        not from Facebook. Once such a post is published, its text is part of the
+        Page's posts and can be read back from Facebook as described in section 4.
+    </p>
+    <p>
+        If you are named in a post, draft or image and want it corrected or
+        removed, contact the operator using the details in section 13. See the
+        <a href="opportunity-data-deletion.html">Data Deletion Instructions</a>.
+        Requests about other records the business holds, such as league records,
+        are handled separately by the operator.
+    </p>
+
+    <h2>7. How Posts Are Approved</h2>
+    <p>
+        The software is designed to publish to Facebook only when the operator has
+        either given an explicit instruction containing the exact text and the
+        specific Page, or approved the exact draft shown for approval. An approval
+        is tied to that exact text (and image, if there is one) and that one Page;
+        the software is designed to check this again immediately before publishing
+        and to refuse if either has changed.
+    </p>
+
+    <h2>8. What Is Stored</h2>
+    <p>
+        The app maintains the records below on the operator's computer. Additional
+        copies and disclosures are described in section 9 (backup copies) and
+        section 10 (sharing and service providers).
+    </p>
+    <ul>
+        <li>The two Page IDs, the two Page names, and one Page access token for each Page, in a configuration file. The Page IDs are also held in the software's database.</li>
+        <li>
+            A delivery log entry for each post, until eligible cleanup (section 9):
+            which Page, the time, the status, the Facebook post ID, a fingerprint
+            (hash) of the content, its length, and the first 120 characters of the
+            post text.
+        </li>
+        <li>
+            A record of each approval: identifiers, fingerprints (hashes), when it
+            was given, the outcome, the Facebook post ID, and any remaining preview
+            of the post text. A short excerpt of that preview is also kept in the
+            software's internal work list.
+        </li>
+        <li>
+            The full text of a draft while it waits for approval. Text in the
+            communication draft record is designed to be cleared when the draft is
+            sent or cancelled, or when cleanup processes an expired draft. Drafts
+            are set to expire after 24 hours. Other copies, including weekly post versions, approval
+            previews and Telegram messages, have separate retention.
+        </li>
+        <li>For weekly league result posts: the full text of each version of the post and the time it was published.</li>
+        <li>If a post includes an image: the image file, in a folder on the same computer (no post has included an image to date).</li>
+        <li>
+            For the logged-out visibility check: for each post, the Page ID and
+            post ID, a copy of the post text used for comparison, the check status
+            and times, and for each check its result, method and a short
+            description of what was found.
+        </li>
+        <li>
+            The software also retains delivery diagnostics, approval and workflow
+            history, league schedule information, and redacted command records.
+        </li>
+        <li>
+            If you send a privacy or deletion request: your message and contact
+            details, in the operator's email mailbox. No request log exists yet.
+            A proposed deletion procedure, which is not yet approved or in use,
+            would create a request log and entries identifying changed posts,
+            including status markers and verification fingerprints (keyed hashes
+            of sample passages of removed text), without retaining the removed
+            text itself.
+        </li>
+    </ul>
+
+    <h2>9. How Long Information Is Kept</h2>
+    <ul>
+        <li>
+            Eligible delivery log entries older than 90 days are designed to be
+            removed when the software starts. Entries can remain longer if the software has not
+            restarted. This cleanup does not remove approval records, weekly post
+            text or backup copies.
+        </li>
+        <li>
+            Approval records, weekly post text, visibility-check records, workflow
+            history and league schedule information have no automatic deletion
+            schedule.
+        </li>
+        <li>Image files and operational logs have no automatic deletion schedule.</li>
+        <li>
+            Stored Page configuration has no automatic deletion schedule.
+            Disconnecting the app does not itself erase local records or backup
+            copies.
+        </li>
+        <li>
+            Request emails have no automatic deletion schedule. No request log
+            is currently in use.
+        </li>
+        <li>
+            If the operator stops using the app with a Page, the app's access
+            is removed, the User requests deletion of information obtained
+            from Facebook, or Meta requires its deletion (which for this app
+            includes the two Page access tokens, the Page IDs and names, the
+            Facebook post IDs, and delivery-status and visibility-check
+            details obtained from Facebook), the operator will promptly end
+            the app's access to the affected Page(s) on Facebook, which is
+            intended to make the stored Page access tokens unusable, and will
+            promptly delete the Page access tokens, Page IDs and Page names
+            from the software's active configuration and from local copies of
+            that configuration. The remaining copies - Page IDs, Facebook post
+            IDs and those details held in the software's database and in
+            notices in the operator's private Telegram chat, copies of them in
+            local safety copies of the database, and copies of the
+            configuration and the database in off-site backups - are not
+            removed by those steps; the operator removes them in a separate
+            step as soon as reasonably possible and does not use them after
+            access is removed. Deleting the Telegram notices is available by
+            hand today. Removal from the database, its copies and off-site
+            backups requires supporting tools that have been tested on
+            synthetic data; that work has not yet been rehearsed or verified
+            in production. The backup item below describes those copies. The
+            30-calendar-day completion target in the Data Deletion
+            Instructions does not limit or delay this paragraph.
+        </li>
+        <li>
+            Backup copies: the computer is configured to be backed up nightly to
+            off-site storage.
+            Backup snapshot selection uses 7 daily, 4 weekly and 6 monthly retention
+            settings. These settings do not guarantee erasure within six months.
+            Data from removed snapshots remains in storage until a separate cleanup
+            is run; that cleanup has not yet been run. The operator also keeps local
+            safety copies of database and configuration files made before software
+            changes. Local safety copies have no scheduled deletion and are included
+            in subsequent off-site backups. Backup copies made before a removal,
+            and later backups containing older local safety copies, may retain
+            removed information.
+        </li>
+        <li>
+            The backup and safety-copy descriptions in this section apply
+            except as stated above for information obtained from Facebook.
+        </li>
+        <li>Posts published to a Page remain on Facebook unless they are removed there.</li>
+    </ul>
+    <p>
+        To ask for something to be corrected or deleted, see the
+        <a href="opportunity-data-deletion.html">Data Deletion Instructions</a>.
+    </p>
+
+    <h2>10. Sharing and Service Providers</h2>
+    <p>
+        The operator uses information obtained from Facebook to publish and keep
+        track of the Page posts described above.
+        The operator does not sell it, does not use it for
+        advertising or to build profiles of people, and does not provide it to
+        data brokers.
+        The software's Facebook component is designed not to pass information
+        received from Facebook to any artificial intelligence service.
+    </p>
+    <p>The following service providers are involved:</p>
+    <ul>
+        <li>
+            <strong>Meta (Facebook):</strong> receives the posts the operator
+            publishes and the requests the app makes, over HTTPS. This includes the
+            logged-out visibility checks, which are ordinary requests to Facebook's
+            public website.
+        </li>
+        <li>
+            <strong>Telegram:</strong> the operator receives draft posts and approval
+            requests, and gives approvals, in the operator's private Telegram chat
+            with the software. Draft text and approval previews are therefore sent
+            through Telegram and remain in that chat unless deleted. Notices about a
+            published post, which include its Facebook post ID, are also sent to
+            that chat.
+        </li>
+        <li>
+            <strong>Google Drive:</strong> stores the nightly off-site backup of the
+            operator's computer, which includes the records and configuration
+            described in section 8, including Page access tokens. The backup is
+            configured to be encrypted on the operator's computer before it is
+            uploaded.
+        </li>
+        <li>
+            <strong>CompuSport:</strong> the source of league results used to prepare
+            posts. The app does not send Facebook information to it.
+        </li>
+        <li>
+            <strong>Email provider:</strong> requests sent to the contact address
+            in section 13 are received in a mailbox at the provider of that
+            address (outlook.com, a Microsoft service).
+        </li>
+        <li>
+            <strong>GitHub Pages:</strong> hosts these policy pages; the app does not
+            upload its operational database, credentials or draft records to GitHub
+            Pages.
+        </li>
+    </ul>
+    <p>Information may also be disclosed when required by law.</p>
+
+    <h2>11. Security</h2>
+    <ul>
+        <li>
+            The software runs on the operator's computer and is intended for use on
+            the operator's private network. Not every connection to its interface on
+            that network is encrypted.
+        </li>
+        <li>
+            The local interface is configured to require an administrator password,
+            which is stored in hashed form. The internal software uses a session
+            cookie for administrator authentication; sessions are set to expire.
+        </li>
+        <li>Telegram approvals are designed to be accepted only from the configured operator account in a private chat.</li>
+        <li>
+            Local database and configuration files, including local safety copies,
+            are not separately encrypted and are not restricted to a single user
+            account on that computer. The software is designed to send Page tokens
+            only to Facebook, over HTTPS, for API authentication; encrypted backup
+            copies containing tokens are also stored on Google Drive.
+        </li>
+        <li>Off-site backup copies are configured to be encrypted before they leave the operator's computer.</li>
+    </ul>
+    <p>
+        This policy page contains no analytics scripts or tracking code added by
+        the operator.
+    </p>
+
+    <h2>12. Children and Participants Under 18</h2>
+    <p>
+        The app is an operator-only business tool, not a service offered to
+        children. League and event post content may contain personal information
+        about participants.
+    </p>
+    <ul>
+        <li>Skyview Pool Leagues is open only to players aged 21 and over.</li>
+        <li>
+            Last Rack Billiards tournaments and events are open to players of all
+            ages, including players under 18. Results posted to the Last Rack
+            Billiards Page may therefore name participants who are under 18.
+        </li>
+    </ul>
+    <p>
+        A participant, or a parent or guardian of a participant under 18, may ask
+        for correction or removal using the contact address in section 13.
+    </p>
+
+    <h2>13. Contact</h2>
+    <p>
+        Lesik Electrical Services LLC<br>
+        Union City, Pennsylvania<br>
+        United States
+    </p>
+    <p>
+        For questions about this Privacy Policy, or to ask for a correction or
+        deletion, contact: <a href="mailto:lesikes@outlook.com">lesikes@outlook.com</a>
+    </p>
+
+    <h2>14. Changes to This Policy</h2>
+    <p>
+        This Privacy Policy may be updated to reflect changes to the app or to how
+        it is used. The effective date at the top of this page will be updated when
+        material changes are made.
+    </p>
+</body>
+</html>
